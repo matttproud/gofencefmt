@@ -148,7 +148,8 @@ visual line mode (**Note:** "VL" is an annotation I am providing, nothing you
 will see in Vim).  After the visual selection has been made, run
 `:! gofencefmt`.
 
-I have **not** tested this gofencefmt with [`conform.nvim`](https://github.com/stevearc/conform.nvim)'s [injected
-language
-formatting](https://github.com/stevearc/conform.nvim/blob/master/doc/advanced_topics.md#injected-language-formatting-code-blocks).  I presume it would work in some capacity.
+I have **not** tested this gofencefmt with [`conform.nvim`]'s [injected
+language formatting].  I presume it would work in some capacity.
 
+[`conform.nvim`]: https://github.com/stevearc/conform.nvim
+[injected language formatting]: https://github.com/stevearc/conform.nvim/blob/master/doc/advanced_topics.md#injected-language-formatting-code-blocks
