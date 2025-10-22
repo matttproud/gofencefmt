@@ -6,11 +6,19 @@ package main
 //
 // Input:
 //
-//	``` if true { fmt.Println("I am invincible!") } ```
+//	```
+//	if true {
+//	fmt.Println("I am invincible!")
+//	}
+//	```
 //
 // Output:
 //
-//	``` if true { fmt.Println("I am invincible!") } ```
+//	```
+//	if true {
+//	 	fmt.Println("I am invincible!")
+// 	}
+//	```
 //
 // If using Vim (or similar) and you visually select the range of text inside
 // of the Markdown fences (```...```), run :!gofencefmt, Vim invokes gofencefmt
@@ -35,6 +43,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"log"
 	"os"
 	"strings"
@@ -72,17 +81,20 @@ func minIndent(in string) (n int) {
 			n = i
 		}
 	}
+	if n < 0 {
+		return 0 // As a failsafe for empty lines.
+	}
 	return n
 }
 
 func toAST(in string) (*dst.File, error) {
-	f, err := func() (f *dst.File, err error) {
+	f, err := func() (_ *dst.File, err error) {
 		defer func() {
 			if data := recover(); data != nil {
-				err = fmt.Errorf("failed: %v", err)
+				err = fmt.Errorf("failed: %v", data)
 			}
 		}()
-		f, err = decorator.Parse(in)
+		f, err := decorator.Parse(in)
 		return f, err
 	}()
 	if err != nil {
@@ -92,6 +104,48 @@ func toAST(in string) (*dst.File, error) {
 }
 
 var errGaveUp = errors.New("could not build AST")
+
+func parseAsWholeProgram(prg string, buf *bytes.Buffer) (*dst.File, error) {
+	defer buf.Reset()
+	fmt.Fprintln(buf, "// BEGIN")
+	buf.WriteString(prg)
+	fmt.Fprintln(buf, "// END")
+	f, err := toAST(buf.String())
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+func parseAsTopLevelIdentifiers(prg string, buf *bytes.Buffer) (*dst.File, error) {
+	defer buf.Reset()
+	fmt.Fprintln(buf, "package main")
+	fmt.Fprintln(buf, "")
+	fmt.Fprintln(buf, "// BEGIN")
+	buf.WriteString(prg)
+	fmt.Fprintln(buf, "// END")
+	f, err := toAST(buf.String())
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+func parseAsFunction(prg string, buf *bytes.Buffer) (*dst.File, error) {
+	defer buf.Reset()
+	fmt.Fprintln(buf, "package main")
+	fmt.Fprintln(buf, "")
+	fmt.Fprintln(buf, "func init() {") // Just an arbitrary function to place things in.
+	fmt.Fprintln(buf, "// BEGIN")
+	buf.WriteString(prg)
+	fmt.Fprintln(buf, "// END")
+	fmt.Fprintln(buf, "}")
+	f, err := toAST(buf.String())
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
 
 // parse attempts to generate an AST from the provided source in the reader.
 // It re-represents the source in various forms in case it cannot be converted
@@ -103,41 +157,68 @@ func parse(r io.Reader) (ast *dst.File, mdIndent int, astIndent int, err error) 
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("reading: %v", err)
 	}
-	astIndent = minIndent(string(in))
-	{
-		// Try as whole program.
-		f, err := toAST(string(in))
-		if err == nil {
-			return f, astIndent, 0, nil
-		}
-	}
+	prg := string(in)
+	astIndent = minIndent(prg)
 	var buf bytes.Buffer
-	{
-		// Try as top-level identifiers.
-		fmt.Fprintln(&buf, "package main")
-		fmt.Fprintln(&buf, "")
-		fmt.Fprintln(&buf, "// BEGIN")
-		buf.Write(in)
-		fmt.Fprintln(&buf, "// END")
-		f, err := toAST(buf.String())
-		if err == nil {
-			return f, astIndent, 0, nil
+	if f, err := parseAsWholeProgram(prg, &buf); err == nil {
+		return f, astIndent, 0, nil
+	}
+	if f, err := parseAsTopLevelIdentifiers(prg, &buf); err == nil {
+		return f, astIndent, 0, nil
+	}
+	if f, err := parseAsFunction(prg, &buf); err == nil {
+		return f, astIndent, 1, nil
+	}
+	return nil, 0, 0, errGaveUp
+}
+
+func trimTrailingSpace(buf *bytes.Buffer) {
+	n := len(bytes.TrimRightFunc(buf.Bytes(), unicode.IsSpace))
+	buf.Truncate(n)
+}
+
+var errNoBeginning = errors.New("could not find beginning")
+
+func seekToBeginning(s *bufio.Scanner) error {
+	for s.Scan() {
+		line := strings.TrimSpace(s.Text())
+		if line == "// BEGIN" {
+			return s.Err()
 		}
 	}
-	// Try as in-function.
-	buf.Reset()
-	fmt.Fprintln(&buf, "package main")
-	fmt.Fprintln(&buf, "")
-	fmt.Fprintln(&buf, "func init() {")
-	fmt.Fprintln(&buf, "// BEGIN")
-	buf.Write(in)
-	fmt.Fprintln(&buf, "// END")
-	fmt.Fprintln(&buf, "}")
-	f, err := toAST(buf.String())
-	if err != nil {
-		return nil, 0, 0, errGaveUp
+	return errNoBeginning
+}
+
+var errNoEnd = errors.New("could not find end")
+
+func readLinesUntilEnd(s *bufio.Scanner) iter.Seq2[string, error] {
+	return func(yield func(string, error) bool) {
+		for s.Scan() {
+			line := s.Text()
+			switch {
+			case strings.TrimSpace(line) == "// END":
+				yield("", s.Err())
+				return
+			case strings.HasSuffix(line, "// END"):
+				yield(strings.TrimSuffix(line, "// END"), s.Err())
+				return
+			default:
+				if !yield(line, nil) {
+					return
+				}
+			}
+		}
+		yield("", errNoEnd)
 	}
-	return f, astIndent, 1, nil
+}
+
+func isExclusivelyWhitespace(s string) bool {
+	for _, r := range s {
+		if !unicode.IsSpace(r) {
+			return false
+		}
+	}
+	return true
 }
 
 func run(r io.Reader, w io.Writer) error {
@@ -149,30 +230,30 @@ func run(r io.Reader, w io.Writer) error {
 	if err := decorator.Fprint(&formatted, f); err != nil {
 		return fmt.Errorf("formatting AST: %v", err)
 	}
-	var trimmed bytes.Buffer
 	scanner := bufio.NewScanner(&formatted)
+	if err := seekToBeginning(scanner); err != nil {
+		return fmt.Errorf("seeking to beginning: %v", err)
+	}
 	indent := strings.Repeat(" ", c)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		trimmedTxt := strings.TrimSpace(txt)
-		if trimmedTxt == "// BEGIN" {
-			trimmed.Reset()
-			continue
+	var buf bytes.Buffer
+	for line, err := range readLinesUntilEnd(scanner) {
+		if err != nil {
+			return fmt.Errorf("reading until end: %v", err)
 		}
-		if trimmedTxt == "// END" {
-			break
-		}
-		if txt != "" {
-			fmt.Fprintf(&trimmed, "%s%s\n", indent, txt[n:])
-		} else {
-			fmt.Fprintf(&trimmed, "%s\n", indent)
+		switch {
+		case isExclusivelyWhitespace(line):
+			if _, err := fmt.Fprintf(&buf, "%s\n", indent); err != nil {
+				return fmt.Errorf("writing empty line: %v", err)
+			}
+		default:
+			if _, err := fmt.Fprintf(&buf, "%s%s\n", indent, line[n:]); err != nil {
+				return fmt.Errorf("writing line: %v", err)
+			}
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanning: %v", err)
-	}
-	if _, err := io.Copy(w, &trimmed); err != nil {
-		return fmt.Errorf("copying reformatted text: %v", err)
+	trimTrailingSpace(&buf)
+	if _, err := io.Copy(w, &buf); err != nil {
+		return err
 	}
 	return nil
 }
