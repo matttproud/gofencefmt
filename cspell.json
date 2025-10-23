@@ -14,6 +14,7 @@
     "nvim"
   ],
   "ignorePaths": [
+    "CHANGELOG.md",
     "go.mod",
     "go.sum",
     "**/*.yml",
