@@ -1,0 +1,15 @@
+version: "2"
+run:
+  timeout: 3m
+linters:
+  default: none
+  enable:
+    - copyloopvar
+    - errcheck
+    - staticcheck
+    - unused
+    - thelper
+    - revive
+formatters:
+  enable:
+    - gofumpt
