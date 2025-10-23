@@ -46,7 +46,11 @@ func Test(t *testing.T) {
 			if err != nil {
 				t.Fatalf("opening input: %v", err)
 			}
-			t.Cleanup(func() { f.Close() })
+			t.Cleanup(func() {
+				if err := f.Close(); err != nil {
+					t.Fatalf("closing file: %v", err)
+				}
+			})
 			var out bytes.Buffer
 			if err := run(f, &out); err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -143,4 +147,3 @@ func TestMinIndent(t *testing.T) {
 func init() {
 	opts.RegisterFlags(flag.CommandLine)
 }
-

@@ -1,5 +1,3 @@
-package main
-
 // Binary gofencefmt reformats Go code that appears in Markdown code fences.
 // It is meant to be invoked in situ in a text editor on range of text, whereby
 // the output is taken and replaces the original text in the buffer.
@@ -17,7 +15,7 @@ package main
 //	```
 //	if true {
 //	 	fmt.Println("I am invincible!")
-// 	}
+//	}
 //	```
 //
 // If using Vim (or similar) and you visually select the range of text inside
@@ -29,13 +27,14 @@ package main
 // things:
 //
 //  1. Reformatting respects the minimum level of indentation that the text
-//  inside the Markdown code fence appears in and re-aligns the reformatted
-//  text along that indentation level.  This is to support code fences that
-//  occur at deeper levels of indentation inside of a Markdown document (e.g.,
-//  inside a list, block quote, etc).
+//     inside the Markdown code fence appears in and re-aligns the reformatted
+//     text along that indentation level.  This is to support code fences that
+//     occur at deeper levels of indentation inside of a Markdown document (e.g.,
+//     inside a list, block quote, etc).
 //
 //  2. It is capable of reformatting whole programs, fragments of top-level
-//  identifiers, and excerpted segments of function blocks. package main
+//     identifiers, and excerpted segments of function blocks. package main
+package main
 
 import (
 	"bufio"
