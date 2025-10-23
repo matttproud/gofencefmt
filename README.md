@@ -33,12 +33,12 @@ func songThatNeverEnds() {
 }
 ```
 
-Note that the code is indented even with Go's native tabs.  Now, that isn't all
+Note that the code is indented even with Go's native tabs. Now, that isn't all
 that interesting in and of itself, so let's consider some more interesting
 cases:
 
 1. **Indented Fences**: Below we have an indented code fence that is a child
-   of this Markdown list item.  It's also malformatted.
+   of this Markdown list item. It's also malformatted.
 
    ```go
    // Input:
@@ -125,13 +125,13 @@ Use the standard `go install` workflow as follows:
 ## Usage
 
 I have been using this with Vim and Neovim through the `!` program filter
-directive.  I use visual line mode to select the range of interest, which is
+directive. I use visual line mode to select the range of interest, which is
 exclusively the Go code in the code fence, and enter the command `:!
 gofencefmt`.
 
 Let's imagine Vim open as such:
 
-~~~
+````
     ```go {.good}
 VL  func Test(t *testing.T) {
 VL  // elided
@@ -141,15 +141,15 @@ VL  }
 VL  // elided
 VL  }
     ```
-~~~
+````
 
 Here the lines prefixed with "VL" indicate these lines have been selected in
 visual line mode (**Note:** "VL" is an annotation I am providing, nothing you
-will see in Vim).  After the visual selection has been made, run
+will see in Vim). After the visual selection has been made, run
 `:! gofencefmt`.
 
 I have **not** tested this gofencefmt with [`conform.nvim`]'s [injected
-language formatting].  I presume it would work in some capacity.
+language formatting]. I presume it would work in some capacity.
 
 [`conform.nvim`]: https://github.com/stevearc/conform.nvim
 [injected language formatting]: https://github.com/stevearc/conform.nvim/blob/master/doc/advanced_topics.md#injected-language-formatting-code-blocks
